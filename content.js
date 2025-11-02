@@ -3,9 +3,9 @@
 // ============================================
 let keywords = [];
 let checkComments = false;
-let partialHashtagMatch = false; // NEW: Enable partial matching for hashtags
+let partialHashtagMatch = false;
 let filteredCount = 0;
-const DEBUG = true; // Enable extensive debugging
+const DEBUG = true;
 
 // ============================================
 // DEBUG HELPER FUNCTIONS
@@ -100,12 +100,11 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 // ============================================
 let mutationCount = 0;
 let lastScanTime = 0;
-const SCAN_THROTTLE = 1000; // Only scan once per second
+const SCAN_THROTTLE = 1000;
 
 const observer = new MutationObserver((mutations) => {
   mutationCount++;
 
-  // Throttle scans to avoid excessive processing
   const now = Date.now();
   if (now - lastScanTime < SCAN_THROTTLE) {
     debugLog(`⏭️ Skipping scan (throttled) - mutation ${mutationCount}`);
@@ -135,28 +134,23 @@ function scanPage() {
     console.log("No keywords to filter");
     return;
   }
-  
+
   console.log("Scanning page for spoilers...");
-  
-  // ============================================
-  // FIND INSTAGRAM POSTS AND REELS
-  // ============================================
-  // Updated selectors to include Reels in infinite scroll
+
   const possibleSelectors = [
-    'article[role="presentation"]',     // Regular posts
-    "article",                           // Generic article tags
-    'div[role="button"] article',       // Posts inside button divs
-    "main article",                      // Articles inside main
-    '[class*="post"]',                   // Any element with "post" in class
-    'div[class*="_ac7v"]',              // Reels container (Instagram class)
-    'div[class*="x1ned7t2"]',           // Another Reels container
-    'div[class*="_aatk"]',              // Reels in feed
-    'div[class*="_aava"]',              // Reels video container
-    'main section > div > div > div',   // Reels in infinite scroll
-    'div[role="presentation"]',         // Alternative reels container
+    'article[role="presentation"]',
+    "article",
+    'div[role="button"] article',
+    "main article",
+    '[class*="post"]',
+    'div[class*="_ac7v"]',
+    'div[class*="x1ned7t2"]',
+    'div[class*="_aatk"]',
+    'div[class*="_aava"]',
+    'main section > div > div > div',
+    'div[role="presentation"]',
   ];
 
-  // Collect posts from ALL selectors, not just the first match
   const postsSet = new Set();
   const selectorMatches = {};
 
@@ -170,7 +164,6 @@ function scanPage() {
       debugLog(`✓ Selector "${selector}" found ${elements.length} elements`);
       selectorMatches[selector] = elements.length;
 
-      // Log details about first matching element
       if (DEBUG && elements.length > 0) {
         debugElement(elements[0], `First match for "${selector}"`);
       }
@@ -193,10 +186,7 @@ function scanPage() {
   }
 
   debugLog(`Processing ${posts.length} unique elements...`);
-  
-  // ============================================
-  // CHECK EACH POST FOR SPOILERS
-  // ============================================
+
   posts.forEach((post, index) => {
     if (post.dataset.spoilerChecked) {
       debugLog(`Skipping post ${index} - already checked`);
@@ -211,10 +201,6 @@ function scanPage() {
     let spoilerText = "";
     let detectionMethod = "";
 
-    // ============================================
-    // PRE-SCAN: TRY TO EXPAND COLLAPSED CONTENT
-    // ============================================
-    // Look for "... more" button and try to expand it
     const moreButtons = post.querySelectorAll('[role="button"]');
     debugLog(`Found ${moreButtons.length} buttons in post`);
 
@@ -222,18 +208,13 @@ function scanPage() {
       const btnText = btn.textContent.toLowerCase();
       if (btnText.includes('more') || btnText.includes('…')) {
         debugLog(`  Button ${btnIdx} might be a "more" button: "${btn.textContent.substring(0, 30)}"`);
-        // Don't click it automatically, just note it
       }
     });
 
-    // ============================================
-    // METHOD 1: CHECK ALL TEXT CONTENT
-    // ============================================
     const allText = post.innerText.toLowerCase();
     debugLog(`\nText content length: ${allText.length} chars`);
     debugLog(`Text preview: "${allText.substring(0, 150)}..."`);
 
-    // Check if content appears to be truncated
     if (allText.includes('… more') || allText.includes('...more')) {
       debugLog(`⚠️ Content appears to be truncated (contains "... more")`);
       debugLog(`This may hide hashtags and full text content`);
@@ -253,17 +234,12 @@ function scanPage() {
         debugLog(`✗ Keyword "${keyword}" not found in text content`);
       }
     }
-    
-    // ============================================
-    // METHOD 2: CHECK HASHTAGS
-    // ============================================
 
-    // Try multiple hashtag selectors
     const hashtagSelectors = [
       'a[href*="/explore/tags/"]',
       'a[href*="/tags/"]',
       'a[href*="explore"][href*="tags"]',
-      'a._aa9_._a6hd',  // Instagram's hashtag class
+      'a._aa9_._a6hd',
     ];
 
     let hashtags = [];
@@ -280,7 +256,6 @@ function scanPage() {
       }
     }
 
-    // Also check all links to see what's available
     const allLinks = post.querySelectorAll('a[href]');
     debugLog(`Total links found in post: ${allLinks.length}`);
     if (DEBUG && allLinks.length > 0) {
@@ -303,9 +278,7 @@ function scanPage() {
       keywords.forEach((keyword) => {
         const keywordLower = keyword.toLowerCase();
 
-        // Check if partial matching is enabled
         if (partialHashtagMatch) {
-          // Partial match: "gym" matches "gymtok", "gymrat", etc.
           if (tagText.includes(keywordLower)) {
             containsSpoiler = true;
             spoilerText = keyword;
@@ -315,7 +288,6 @@ function scanPage() {
             debugLog(`  ✗ No partial match: "${keyword}" not in "#${tagText}"`);
           }
         } else {
-          // Exact match only: "gym" only matches "#gym"
           if (tagText === keywordLower) {
             containsSpoiler = true;
             spoilerText = keyword;
@@ -327,10 +299,7 @@ function scanPage() {
         }
       });
     });
-    
-    // ============================================
-    // IF SPOILER FOUND: BLUR THE POST
-    // ============================================
+
     if (containsSpoiler) {
       debugLog(`\n🚨 SPOILER FOUND in post ${index}!`);
       debugLog(`  Keyword: "${spoilerText}"`);
@@ -359,7 +328,6 @@ function blurPost(post, keyword) {
   debugLog(`\n=== BLURRING POST ===`);
   debugLog(`Keyword: "${keyword}"`);
 
-  // Check if already blurred
   if (post.querySelector(".spoiler-overlay")) {
     debugLog("⚠️ Post already has overlay - skipping");
     return;
@@ -367,11 +335,10 @@ function blurPost(post, keyword) {
 
   debugElement(post, "Post being blurred");
 
-  // Create overlay
   const overlay = document.createElement("div");
   overlay.className = "spoiler-overlay";
   debugLog("Created overlay element");
-  
+
   overlay.style.cssText = `
     position: absolute;
     top: 0;
@@ -392,7 +359,8 @@ function blurPost(post, keyword) {
     box-sizing: border-box;
     border-radius: inherit;
   `;
-  
+
+  // ✅ **CHANGE**: The "Hide Post" button has been removed from the HTML below.
   overlay.innerHTML = `
     <div style="font-size: 48px; margin-bottom: 15px;">⚠️</div>
     <div style="font-size: 18px; font-weight: bold; margin-bottom: 10px;">
@@ -414,22 +382,8 @@ function blurPost(post, keyword) {
       position: relative;
       z-index: 1000000;
     ">Show Anyway</button>
-    <button class="hide-post-btn" style="
-      background: transparent;
-      color: white;
-      border: 1px solid white;
-      padding: 10px 24px;
-      border-radius: 8px;
-      cursor: pointer;
-      font-weight: 600;
-      font-size: 14px;
-      margin: 5px;
-      position: relative;
-      z-index: 1000000;
-    ">Hide Post</button>
   `;
-  
-  // Make sure post container is relative or has positioning context
+
   const currentPosition = window.getComputedStyle(post).position;
   debugLog(`Post position before adjustment: ${currentPosition}`);
 
@@ -438,7 +392,6 @@ function blurPost(post, keyword) {
     debugLog("Changed post position to: relative");
   }
 
-  // Get post dimensions before modification
   const beforeDimensions = {
     offsetWidth: post.offsetWidth,
     offsetHeight: post.offsetHeight,
@@ -448,12 +401,10 @@ function blurPost(post, keyword) {
   };
   debugLog("Post dimensions before overlay:", beforeDimensions);
 
-  // Ensure post has overflow hidden to contain the overlay
   const currentOverflow = window.getComputedStyle(post).overflow;
   debugLog(`Post overflow before adjustment: ${currentOverflow}`);
   post.style.overflow = "hidden";
 
-  // For reels, ensure the container has a minimum height
   const postHeight = post.offsetHeight;
   if (postHeight < 400) {
     debugLog(`⚠️ Post height (${postHeight}px) is too small, setting min-height to 400px`);
@@ -465,7 +416,6 @@ function blurPost(post, keyword) {
   post.appendChild(overlay);
   debugLog("✓ Overlay appended to post");
 
-  // Verify overlay was added correctly
   const overlayCheck = post.querySelector(".spoiler-overlay");
   if (overlayCheck) {
     debugLog("✓ Overlay successfully found in DOM");
@@ -479,45 +429,25 @@ function blurPost(post, keyword) {
   } else {
     debugLog("❌ ERROR: Overlay not found in DOM after appending!");
   }
-  
-  // ============================================
-  // IMPROVED BUTTON CLICK HANDLERS
-  // ============================================
-  // "Show Anyway" button
+
   const showBtn = overlay.querySelector(".show-anyway-btn");
   if (showBtn) {
     showBtn.addEventListener("click", (e) => {
       debugLog("'Show Anyway' button clicked");
       e.preventDefault();
       e.stopPropagation();
-      e.stopImmediatePropagation(); // Extra stop for nested handlers
+      e.stopImmediatePropagation();
       overlay.remove();
       debugLog("✓ Overlay removed - post now visible");
-    }, true); // Use capture phase
+    }, true);
     debugLog("✓ 'Show Anyway' button listener attached");
   } else {
     debugLog("❌ ERROR: 'Show Anyway' button not found!");
   }
 
-  // "Hide Post" button
-  const hideBtn = overlay.querySelector(".hide-post-btn");
-  if (hideBtn) {
-    hideBtn.addEventListener("click", (e) => {
-      debugLog("'Hide Post' button clicked");
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-      post.style.display = "none";
-      debugLog("✓ Post hidden (display: none)");
-    }, true); // Use capture phase
-    debugLog("✓ 'Hide Post' button listener attached");
-  } else {
-    debugLog("❌ ERROR: 'Hide Post' button not found!");
-  }
+  // ✅ **CHANGE**: The event listener for the "Hide Post" button has been removed.
 
-  // Also prevent clicks on the overlay itself from propagating
   overlay.addEventListener("click", (e) => {
-    // Only stop propagation if clicking the overlay background, not buttons
     if (e.target === overlay) {
       debugLog("Overlay background clicked (not a button)");
       e.stopPropagation();
@@ -533,7 +463,6 @@ function blurPost(post, keyword) {
 debugLog("\n✅ Instagram Spoiler Filter READY!");
 debugLog("Extension is now monitoring the page for spoilers");
 
-// Also scan when navigating within Instagram (SPA navigation)
 let lastUrl = location.href;
 new MutationObserver(() => {
   const url = location.href;
