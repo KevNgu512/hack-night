@@ -9,17 +9,22 @@ chrome.storage.sync.get(['keywords', 'checkComments', 'filteredCount'], (data) =
   checkComments = data.checkComments || false;
   filteredCount = data.filteredCount || 0;
   console.log('Spoiler filter loaded with keywords:', keywords);
-  scanPage();
+  console.log('Check comments enabled:', checkComments);
+  
+  // Initial scan after a short delay to let Instagram load
+  setTimeout(scanPage, 2000);
 });
 
 // Listen for updates from popup
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'updateKeywords') {
     keywords = message.keywords;
+    console.log('Keywords updated:', keywords);
     scanPage();
   } else if (message.action === 'updateSettings') {
     chrome.storage.sync.get(['checkComments'], (data) => {
       checkComments = data.checkComments || false;
+      console.log('Settings updated, checkComments:', checkComments);
       scanPage();
     });
   }
@@ -36,12 +41,37 @@ observer.observe(document.body, {
 });
 
 function scanPage() {
-  if (keywords.length === 0) return;
+  if (keywords.length === 0) {
+    console.log('No keywords to filter');
+    return;
+  }
 
-  // Instagram's post article elements
-  const posts = document.querySelectorAll('article[role="presentation"]');
+  console.log('Scanning page for spoilers...');
+
+  // Try multiple selectors for Instagram posts (they change frequently)
+  const possibleSelectors = [
+    'article[role="presentation"]',
+    'article',
+    'div[role="button"] article',
+    'main article',
+    '[class*="post"]'
+  ];
+
+  let posts = [];
+  for (const selector of possibleSelectors) {
+    posts = document.querySelectorAll(selector);
+    if (posts.length > 0) {
+      console.log(`Found ${posts.length} posts using selector: ${selector}`);
+      break;
+    }
+  }
+
+  if (posts.length === 0) {
+    console.log('No posts found on page');
+    return;
+  }
   
-  posts.forEach(post => {
+  posts.forEach((post, index) => {
     // Skip if already processed
     if (post.dataset.spoilerChecked) return;
     post.dataset.spoilerChecked = 'true';
@@ -49,42 +79,33 @@ function scanPage() {
     let containsSpoiler = false;
     let spoilerText = '';
 
-    // Check caption/description
-    const captionElements = post.querySelectorAll('h1, span, div[class*="caption"]');
-    captionElements.forEach(el => {
-      const text = el.textContent.toLowerCase();
-      const found = keywords.find(keyword => text.includes(keyword));
-      if (found) {
+    // Get all text content from the post
+    const allText = post.innerText.toLowerCase();
+    
+    // Check for keywords in all text
+    for (const keyword of keywords) {
+      if (allText.includes(keyword)) {
         containsSpoiler = true;
-        spoilerText = found;
+        spoilerText = keyword;
+        console.log(`Post ${index} contains spoiler keyword: "${keyword}"`);
+        break;
       }
-    });
+    }
 
-    // Check hashtags
-    const hashtags = post.querySelectorAll('a[href*="/explore/tags/"]');
+    // Also specifically check hashtags
+    const hashtags = post.querySelectorAll('a[href*="/explore/tags/"], a[href*="/tags/"]');
     hashtags.forEach(tag => {
       const tagText = tag.textContent.toLowerCase();
       const found = keywords.find(keyword => tagText.includes(keyword));
       if (found) {
         containsSpoiler = true;
         spoilerText = found;
+        console.log(`Post ${index} has hashtag spoiler: "${found}"`);
       }
     });
 
-    // Check comments if enabled
-    if (checkComments) {
-      const comments = post.querySelectorAll('ul li span, div[role="button"] + span');
-      comments.forEach(comment => {
-        const commentText = comment.textContent.toLowerCase();
-        const found = keywords.find(keyword => commentText.includes(keyword));
-        if (found) {
-          containsSpoiler = true;
-          spoilerText = found;
-        }
-      });
-    }
-
     if (containsSpoiler) {
+      console.log(`Blurring post ${index} due to keyword: "${spoilerText}"`);
       blurPost(post, spoilerText);
       filteredCount++;
       chrome.storage.sync.set({ filteredCount });
@@ -93,8 +114,14 @@ function scanPage() {
 }
 
 function blurPost(post, keyword) {
+  // Check if already blurred
+  if (post.querySelector('.spoiler-overlay')) {
+    return;
+  }
+
   // Create overlay
   const overlay = document.createElement('div');
+  overlay.className = 'spoiler-overlay';
   overlay.style.cssText = `
     position: absolute;
     top: 0;
@@ -103,7 +130,7 @@ function blurPost(post, keyword) {
     height: 100%;
     background: rgba(0, 0, 0, 0.95);
     backdrop-filter: blur(20px);
-    z-index: 999;
+    z-index: 999999;
     display: flex;
     flex-direction: column;
     align-items: center;
@@ -122,7 +149,7 @@ function blurPost(post, keyword) {
     <div style="font-size: 14px; color: #ccc; margin-bottom: 20px;">
       Contains: "${keyword}"
     </div>
-    <button style="
+    <button class="show-anyway-btn" style="
       background: #0095f6;
       color: white;
       border: none;
@@ -133,7 +160,7 @@ function blurPost(post, keyword) {
       font-size: 14px;
       margin: 5px;
     ">Show Anyway</button>
-    <button style="
+    <button class="hide-post-btn" style="
       background: transparent;
       color: white;
       border: 1px solid white;
@@ -151,14 +178,19 @@ function blurPost(post, keyword) {
   post.appendChild(overlay);
 
   // Show anyway button
-  overlay.querySelector('button:first-of-type').addEventListener('click', () => {
+  overlay.querySelector('.show-anyway-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
     overlay.remove();
+    console.log('User chose to show post anyway');
   });
 
   // Hide post button
-  overlay.querySelector('button:last-of-type').addEventListener('click', () => {
+  overlay.querySelector('.hide-post-btn').addEventListener('click', (e) => {
+    e.stopPropagation();
     post.style.display = 'none';
+    console.log('User chose to hide post');
   });
 }
 
 console.log('Instagram Spoiler Filter active!');
+console.log('Current URL:', window.location.href);
