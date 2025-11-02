@@ -214,17 +214,83 @@ function scanPage() {
     // ============================================
     // PRE-SCAN: TRY TO EXPAND COLLAPSED CONTENT
     // ============================================
-    // Look for "... more" button and try to expand it
-    const moreButtons = post.querySelectorAll('[role="button"]');
-    debugLog(`Found ${moreButtons.length} buttons in post`);
+    // Look for "... more" text in caption
+    const captionSpans = post.querySelectorAll('span');
+    let expandedContent = false;
 
-    moreButtons.forEach((btn, btnIdx) => {
-      const btnText = btn.textContent.toLowerCase();
-      if (btnText.includes('more') || btnText.includes('…')) {
-        debugLog(`  Button ${btnIdx} might be a "more" button: "${btn.textContent.substring(0, 30)}"`);
-        // Don't click it automatically, just note it
+    debugLog(`Searching for collapsible content...`);
+
+    captionSpans.forEach((span, spanIdx) => {
+      const spanText = span.textContent;
+
+      // Check if this span contains "... more" text
+      if (spanText.includes('… more') || spanText.includes('...more')) {
+        debugLog(`  Found collapsed caption in span ${spanIdx}`);
+
+        // Look for the "more" button - it's usually a parent or sibling
+        // Try to find a clickable element near this span
+        let moreButton = null;
+
+        // Strategy 1: Look for aria-hidden span with "more" text
+        const moreSpans = span.querySelectorAll('span[aria-hidden="true"]');
+        moreSpans.forEach((moreSpan) => {
+          if (moreSpan.textContent.includes('more') || moreSpan.textContent.includes('…')) {
+            // The button is likely the parent div
+            let parent = moreSpan.parentElement;
+            while (parent && parent !== post) {
+              if (parent.getAttribute('role') === 'button' || parent.hasAttribute('tabindex')) {
+                moreButton = parent;
+                break;
+              }
+              parent = parent.parentElement;
+            }
+          }
+        });
+
+        // Strategy 2: Look for div with role=button that's a sibling or ancestor
+        if (!moreButton) {
+          let element = span;
+          while (element && element !== post) {
+            if (element.getAttribute('role') === 'button') {
+              moreButton = element;
+              break;
+            }
+            // Check siblings
+            const siblings = element.parentElement?.children;
+            if (siblings) {
+              for (let sibling of siblings) {
+                if (sibling.getAttribute('role') === 'button' &&
+                    sibling.textContent.toLowerCase().includes('more')) {
+                  moreButton = sibling;
+                  break;
+                }
+              }
+            }
+            element = element.parentElement;
+          }
+        }
+
+        if (moreButton) {
+          debugLog(`  Found "more" button, clicking to expand...`);
+          try {
+            moreButton.click();
+            expandedContent = true;
+            debugLog(`  ✓ Clicked "more" button successfully`);
+          } catch (err) {
+            debugLog(`  ❌ Error clicking "more" button: ${err.message}`);
+          }
+        } else {
+          debugLog(`  ⚠️ Could not find "more" button to click`);
+        }
       }
     });
+
+    // If we expanded content, give it a moment to render
+    if (expandedContent) {
+      debugLog(`  Waiting 100ms for content to expand...`);
+      // Note: We can't use async/await here, so we'll just continue
+      // The expanded content should be synchronously available after click
+    }
 
     // ============================================
     // METHOD 1: CHECK ALL TEXT CONTENT
@@ -284,16 +350,27 @@ function scanPage() {
     const allLinks = post.querySelectorAll('a[href]');
     debugLog(`Total links found in post: ${allLinks.length}`);
     if (DEBUG && allLinks.length > 0) {
-      debugLog(`Sample of link hrefs (first 5):`);
-      Array.from(allLinks).slice(0, 5).forEach((link, i) => {
-        debugLog(`  Link ${i}: ${link.href} - Text: "${link.textContent.substring(0, 30)}"`);
+      debugLog(`Sample of link hrefs (first 10):`);
+      Array.from(allLinks).slice(0, 10).forEach((link, i) => {
+        const href = link.href;
+        const isHashtag = href.includes('/explore/tags/') || href.includes('/tags/');
+        const marker = isHashtag ? '🏷️' : '  ';
+        debugLog(`  ${marker} Link ${i}: ${href.substring(href.indexOf('instagram.com/') + 14, 80)} - Text: "${link.textContent.substring(0, 20)}"`);
       });
+
+      // Count hashtag links
+      const hashtagLinks = Array.from(allLinks).filter(link =>
+        link.href.includes('/explore/tags/') || link.href.includes('/tags/')
+      );
+      debugLog(`🏷️ Total hashtag links in DOM: ${hashtagLinks.length}`);
     }
 
-    debugLog(`Found ${hashtags.length} hashtags in post ${index}`);
+    debugLog(`Found ${hashtags.length} hashtags via selectors in post ${index}`);
     if (hashtags.length > 0) {
       const hashtagTexts = Array.from(hashtags).map(tag => tag.textContent);
       debugLog(`Hashtags:`, hashtagTexts);
+    } else if (expandedContent) {
+      debugLog(`⚠️ WARNING: Expanded content but still found 0 hashtags via selectors!`);
     }
 
     hashtags.forEach((tag, tagIndex) => {
