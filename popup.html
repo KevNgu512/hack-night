@@ -88,6 +88,30 @@
       font-size: 13px;
       color: #262626;
     }
+    .checkbox-label {
+      font-weight: normal;
+      display: flex;
+      align-items: flex-start;
+      cursor: pointer;
+      margin-bottom: 10px;
+    }
+    .checkbox-label input {
+      margin-right: 8px;
+      margin-top: 2px;
+    }
+    .checkbox-text {
+      flex: 1;
+    }
+    .warning-badge {
+      display: inline-block;
+      background: #fff3cd;
+      color: #856404;
+      padding: 2px 6px;
+      border-radius: 3px;
+      font-size: 11px;
+      margin-left: 5px;
+      font-weight: 600;
+    }
   </style>
 </head>
 <body>
@@ -99,24 +123,36 @@
     <div class="help-text">Press Enter or click Add to save. Separate multiple with commas.</div>
     <button id="addBtn">Add Keywords</button>
   </div>
-
+  
   <div class="section">
     <label>Your Blocked Keywords:</label>
     <div id="keywordsList" class="keywords-list">
       <span style="color: #8e8e8e;">No keywords added yet</span>
     </div>
   </div>
-
+  
   <div class="section">
-    <label>
-      <input type="checkbox" id="checkComments"> Also scan comments for spoilers
+    <label class="checkbox-label">
+      <input type="checkbox" id="checkComments">
+      <span class="checkbox-text">Also scan comments for spoilers</span>
+    </label>
+    
+    <label class="checkbox-label">
+      <input type="checkbox" id="partialHashtagMatch">
+      <span class="checkbox-text">
+        Partial hashtag matching
+        <span class="warning-badge">USE CAREFULLY</span>
+        <div class="help-text" style="margin-top: 3px;">
+          When enabled, "gym" filters #gymtok, #gymrat, etc. Disable for broad keywords like "AI" to avoid over-filtering.
+        </div>
+      </span>
     </label>
   </div>
-
+  
   <div class="stats" id="stats">
     Posts filtered: 0
   </div>
-
+  
   <script src="popup.js"></script>
 </body>
 </html>
