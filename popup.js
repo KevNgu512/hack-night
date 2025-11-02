@@ -9,28 +9,28 @@ document.addEventListener("DOMContentLoaded", () => {
       // Load keywords
       const keywords = data.keywords || [];
       displayKeywords(keywords);
-      
+
       // Load checkbox states
       document.getElementById("checkComments").checked = data.checkComments || false;
       document.getElementById("partialHashtagMatch").checked = data.partialHashtagMatch || false;
-      
+
       // Load filtered count
       document.getElementById("stats").textContent = `Posts filtered: ${data.filteredCount || 0}`;
     }
   );
-  
+
   // ============================================
   // ADD KEYWORDS BUTTON HANDLER
   // ============================================
   document.getElementById("addBtn").addEventListener("click", addKeywords);
-  
+
   // Allow Enter key to add keywords
   document.getElementById("keywordInput").addEventListener("keypress", (e) => {
     if (e.key === "Enter") {
       addKeywords();
     }
   });
-  
+
   // ============================================
   // CHECKBOX CHANGE HANDLERS
   // ============================================
@@ -40,7 +40,7 @@ document.addEventListener("DOMContentLoaded", () => {
       notifyContentScript();
     });
   });
-  
+
   document.getElementById("partialHashtagMatch").addEventListener("change", (e) => {
     chrome.storage.sync.set({ partialHashtagMatch: e.target.checked }, () => {
       console.log("Partial hashtag match setting saved:", e.target.checked);
@@ -55,32 +55,32 @@ document.addEventListener("DOMContentLoaded", () => {
 function addKeywords() {
   const input = document.getElementById("keywordInput");
   const newKeywordsText = input.value.trim();
-  
+
   if (!newKeywordsText) {
     return; // Don't add empty keywords
   }
-  
+
   // Split by commas and clean up each keyword
   const newKeywords = newKeywordsText
     .split(",")
     .map((k) => k.trim().toLowerCase())
     .filter((k) => k.length > 0);
-  
+
   if (newKeywords.length === 0) {
     return;
   }
-  
+
   // Get existing keywords from storage
   chrome.storage.sync.get(["keywords"], (data) => {
     let keywords = data.keywords || [];
-    
+
     // Add new keywords (avoid duplicates)
     newKeywords.forEach((keyword) => {
       if (!keywords.includes(keyword)) {
         keywords.push(keyword);
       }
     });
-    
+
     // Save updated keywords
     chrome.storage.sync.set({ keywords }, () => {
       console.log("Keywords saved:", keywords);
@@ -96,12 +96,12 @@ function addKeywords() {
 // ============================================
 function displayKeywords(keywords) {
   const container = document.getElementById("keywordsList");
-  
+
   if (keywords.length === 0) {
     container.innerHTML = '<span style="color: #8e8e8e;">No keywords added yet</span>';
     return;
   }
-  
+
   // Create keyword tags with remove buttons
   container.innerHTML = keywords
     .map(
@@ -113,7 +113,7 @@ function displayKeywords(keywords) {
     `
     )
     .join("");
-  
+
   // Add click handlers to remove buttons
   container.querySelectorAll(".remove-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
@@ -128,10 +128,10 @@ function displayKeywords(keywords) {
 function removeKeyword(keywordToRemove) {
   chrome.storage.sync.get(["keywords"], (data) => {
     let keywords = data.keywords || [];
-    
+
     // Filter out the keyword to remove
     keywords = keywords.filter((k) => k !== keywordToRemove);
-    
+
     // Save updated keywords
     chrome.storage.sync.set({ keywords }, () => {
       console.log("Keyword removed:", keywordToRemove);
