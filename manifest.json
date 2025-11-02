@@ -1,0 +1,29 @@
+{
+  "manifest_version": 3,
+  "name": "Instagram Spoiler Filter",
+  "version": "1.0",
+  "description": "Filter Instagram posts and comments to avoid spoilers for your favorite shows and movies",
+  "permissions": [
+    "storage"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "icon16.png",
+      "48": "icon48.png",
+      "128": "icon128.png"
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["*://*.instagram.com/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "icons": {
+    "16": "icon16.png",
+    "48": "icon48.png",
+    "128": "icon128.png"
+  }
+}
